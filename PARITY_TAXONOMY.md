@@ -6,14 +6,46 @@
 
 | # | Algorithm class | Parity criterion | Default threshold | Example R packages |
 |---|---|---|---|---|
-| 1 | **Deterministic numerical** | element-wise: `max abs err < tol` AND Pearson = 1 | `tol = 1e-13` (f64), `Pearson = 1.0` | BandNorm, scHiCluster kernels |
+| 1 | **Deterministic numerical** (3 sub-tiers — see below) | element-wise: `max abs err < tol` (optionally `rtol`-scaled) | **standard: `1e-8`**; strict: `1e-13`; bounded: `1e-6` | BandNorm, scHiCluster kernels |
 | 2 | **Stochastic numerical** | distributional: Kolmogorov–Smirnov ≤ τ or Wasserstein-1 ≤ τ | KS-p ≥ 0.05 *or* W₁ ≤ 1% of scale | MCMC draws, Bayesian posteriors |
 | 3 | **Combinatorial clustering** | label-invariant: ARI / NMI / Fowlkes–Mallows | ARI ≥ 0.95 | mclust, scDblFinder clusters, sc3 |
 | 4 | **Continuous embedding** | rotation-invariant: Procrustes similarity (1 − min‖.‖² after best rotation/translation/scaling) | Procrustes ≥ 0.95 | Seurat CCA, PCA, UMAP, t-SNE |
 | 5 | **Ranked output** | top-K Jaccard / Spearman correlation of the ranking | top-50 Jaccard ≥ 0.8; Spearman ≥ 0.9 | COSG marker genes, DE rankings |
-| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman correlation of per-cell values | Pearson ≥ 0.99 | Monocle 2 pseudotime, Slingshot |
+| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman correlation of per-cell values | Pearson ≥ 0.99 (treats ≥ `1 − 1e-12` as exact — `pearsonr` is itself f64-noisy) | Monocle 2 pseudotime, Slingshot |
 | 7 | **Classification (binary / multi)** | label agreement / F1 | Agreement ≥ 0.95 | DoubletFinder, scDblFinder labels |
 | 8 | **Statistical inference** | rank correlation on −log10 p + top-k overlap | Spearman ≥ 0.90 on −log10 p; top-50 Jaccard ≥ 0.7 | miloR DA test, limma/DESeq2, tradeSeq |
+
+### Deterministic sub-tiers (class 1)
+
+The class-1 threshold needs to absorb two independent error sources:
+
+| Source | Typical magnitude |
+|---|---|
+| f64 rounding + BLAS divergence (R uses one BLAS, Python uses another) | `eps · √N` ≈ `1e-14` to `1e-10` |
+| Any (B) bounded ε-approximation introduced by an Acceleration rewrite | per-rewrite, typically `1e-9` to `1e-6` (sum of admitted rewrites, derived in `MATH.md`) |
+
+So a single fixed threshold is the wrong abstraction. Pick a sub-tier per port:
+
+| Sub-tier (`manifest.yaml::algorithm_class`) | Default `atol` | Default `rtol` | Hard ceiling | When to use |
+|---|---|---|---|---|
+| `deterministic-strict` | `1e-13` | `1e-15` | `1e-13` | element-wise / single-pass / same BLAS. Example: rust-bandnorm. |
+| `deterministic` **(alias)** / `deterministic-standard` | **`1e-8`** | — | `1e-8` | Default. One or two matmul / PCA, cross-BLAS R↔Py is fine. |
+| `deterministic-bounded` | `1e-6` | — | `1e-6` | Contains (B) ε-approximation rewrites. `MATH.md` must derive `Σ bound ≤ atol`. |
+
+**Hard ceiling rule**: any `deterministic-*` threshold above `1e-6` is rejected by `is_pass()` — at that scale "deterministic" has lost meaning and the port should switch to `ordinal` (Pearson) or `embedding` (Procrustes) instead. This is non-negotiable; widening the gate is the cardinal sin the protocol forbids.
+
+**Relative-tolerance mode**: when output values span many orders of magnitude (p-values, abundance counts, eigenvalues), set `parity_rtol` in the manifest:
+
+```yaml
+algorithm_class: deterministic-standard
+parity_threshold: 1.0          # required when rtol > 0; pass iff returned-value < 1
+parity_rtol: 1e-8              # error scaled by rtol·|reference|
+parity_atol: 1e-10             # small absolute floor for values near zero
+```
+
+`parity_deterministic(..., rtol=...)` then returns `max(|ref - cand| / (rtol·|ref| + tiny))`, and `parity_threshold` caps that normalised quantity (typically `1.0`).
+
+**Why ordinal treats `1.0` as `≥ 1 − 1e-12`**: `scipy.stats.pearsonr` accumulates f64 rounding internally. Even on bit-identical inputs the returned `r` is typically `0.9999999999999999`, not literal `1.0`. The `is_pass` helper subtracts `1e-12` from the ordinal threshold before the comparison so a perfect port doesn't fail by one ulp.
 
 ## How to pick the class
 

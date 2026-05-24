@@ -53,15 +53,47 @@ def t_imports():
 
 def t_parity_metrics():
     import numpy as np
-    from parity_metrics import compute_parity, is_pass, default_threshold, VALID_CLASSES
+    import pytest
+    from parity_metrics import (
+        compute_parity, is_pass, default_threshold,
+        VALID_CLASSES, DETERMINISTIC_HARD_CEILING,
+    )
 
-    assert len(VALID_CLASSES) == 8, f"expected 8 algorithm classes, got {len(VALID_CLASSES)}"
+    # 8 base classes + 3 deterministic sub-tiers = 11 valid class names.
+    expected = {
+        "deterministic", "deterministic-strict",
+        "deterministic-standard", "deterministic-bounded",
+        "stochastic", "clustering", "embedding", "ranked",
+        "ordinal", "classification", "inference",
+    }
+    assert VALID_CLASSES == expected, f"expected {expected}, got {VALID_CLASSES}"
+    assert DETERMINISTIC_HARD_CEILING == 1e-6
 
     rng = np.random.default_rng(42)
 
-    # deterministic — bit-equivalent
+    # deterministic — bit-equivalent passes ALL tiers
     a = rng.normal(0, 1, 100); b = a + 1e-15
-    m = compute_parity(a, b, "deterministic"); assert is_pass(m, "deterministic"), m
+    m = compute_parity(a, b, "deterministic")
+    assert is_pass(m, "deterministic"), m              # default 1e-8
+    assert is_pass(m, "deterministic-strict"), m       # 1e-13
+    assert is_pass(m, "deterministic-bounded"), m      # 1e-6
+    # a ~1e-7 perturbation: fails strict + standard, passes bounded
+    c = a + 2e-7
+    m = compute_parity(a, c, "deterministic")
+    assert not is_pass(m, "deterministic-strict"), m
+    assert not is_pass(m, "deterministic-standard"), m
+    assert is_pass(m, "deterministic-bounded"), m
+    # rtol mode: 1e-9 fractional perturbation under rtol=1e-7 should pass
+    d = a * (1 + 1e-9)
+    m_rel = compute_parity(a, d, "deterministic", rtol=1e-7)
+    assert m_rel < 1, f"rtol mode returned {m_rel}, expected < 1"
+    # hard ceiling: threshold > 1e-6 raises for any deterministic tier
+    try:
+        is_pass(1e-5, "deterministic", threshold=1e-5)
+    except ValueError as e:
+        assert "hard ceiling" in str(e), e
+    else:
+        raise AssertionError("hard ceiling did not fire")
 
     # stochastic — same distribution
     a = rng.normal(0, 1, 200); b = rng.normal(0, 1, 200)

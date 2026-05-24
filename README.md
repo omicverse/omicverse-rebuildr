@@ -154,12 +154,12 @@ Different algorithms have different invariance structures, so "same output" need
 
 | # | Class | Parity criterion | Default threshold | Example R packages |
 |---|---|---|---|---|
-| 1 | **Deterministic numerical** | element-wise `max_abs_err < tol` AND Pearson = 1 | `tol = 1e-13` (f64) | BandNorm, scHiCluster kernels |
+| 1 | **Deterministic numerical** (3 sub-tiers — see [PARITY_TAXONOMY.md](PARITY_TAXONOMY.md#deterministic-sub-tiers-class-1)) | element-wise `max_abs_err < tol`, optional `rtol`-scaled | **standard `1e-8`** / strict `1e-13` / bounded `1e-6`; **hard ceiling `1e-6`** | BandNorm, scHiCluster kernels |
 | 2 | **Stochastic numerical** | Kolmogorov–Smirnov ≤ τ or Wasserstein-1 ≤ τ | KS-p ≥ 0.05 | MCMC draws, Bayesian posteriors |
 | 3 | **Combinatorial clustering** | label-invariant: ARI / NMI / Fowlkes–Mallows | ARI ≥ 0.95 | mclust, scDblFinder, sc3 |
 | 4 | **Continuous embedding** | rotation-invariant: Procrustes similarity | Procrustes ≥ 0.95 | Seurat CCA, PCA, UMAP, t-SNE |
 | 5 | **Ranked output** | top-K Jaccard / Spearman correlation | top-50 Jaccard ≥ 0.8 | COSG markers, DE rankings |
-| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman correlation | Pearson ≥ 0.99 | Monocle 2, Slingshot, TSCAN |
+| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman correlation | Pearson ≥ 0.99 (≥ `1 − 1e-12` treated as exact) | Monocle 2, Slingshot, TSCAN |
 | 7 | **Classification** | label agreement / F1 | F1 ≥ 0.95 | DoubletFinder, scDblFinder labels |
 | 8 | **Statistical inference** | rank corr on −log10 p + top-K Jaccard | Spearman ≥ 0.90 | miloR DA, limma, DESeq2, tradeSeq |
 

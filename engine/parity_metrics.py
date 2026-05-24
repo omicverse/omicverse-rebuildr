@@ -23,17 +23,38 @@ import numpy as np
 # ----------------------------------------------------------------------------- #
 
 DEFAULT_THRESHOLD = {
-    "deterministic":   1e-13,    # max abs err
-    "stochastic":      0.05,     # KS p-value floor
-    "clustering":      0.95,     # ARI
-    "embedding":       0.95,     # Procrustes similarity
-    "ranked":          0.80,     # top-50 Jaccard
-    "ordinal":         0.99,     # Pearson
-    "classification":  0.95,     # F1
-    "inference":       0.90,     # Spearman on -log10 p
+    # Deterministic-numerical: three tiers from strict bit-equivalence to
+    # bounded-approximation. See PARITY_TAXONOMY.md §Deterministic sub-tiers.
+    # The bare alias "deterministic" maps to the **standard** tier (1e-8) —
+    # tight enough to catch real divergence, loose enough to absorb cross-BLAS
+    # rounding and a single matmul / decomposition on real data.
+    "deterministic":          1e-8,    # alias for the standard tier
+    "deterministic-strict":   1e-13,   # element-wise, same BLAS, no chained ops
+    "deterministic-standard": 1e-8,    # one or two matmul/PCA; cross-BLAS OK
+    "deterministic-bounded":  1e-6,    # contains (B) ε-approx rewrites; MATH.md
+                                       # must derive Σ bound ≤ this value
+    "stochastic":             0.05,    # KS p-value floor
+    "clustering":             0.95,    # ARI
+    "embedding":              0.95,    # Procrustes similarity
+    "ranked":                 0.80,    # top-50 Jaccard
+    "ordinal":                0.99,    # Pearson (NOT bit-exact 1.0 — see is_pass)
+    "classification":         0.95,    # F1
+    "inference":              0.90,    # Spearman on -log10 p
 }
 
+# Hard ceiling: any threshold above this is rejected for the deterministic
+# family because it stops being "deterministic" — the user should switch to
+# ordinal (Pearson) or embedding (Procrustes) instead.
+DETERMINISTIC_HARD_CEILING = 1e-6
+
+# Set of all algorithm-class names valid in manifest.yaml.
 VALID_CLASSES = set(DEFAULT_THRESHOLD)
+
+# Map every deterministic sub-tier to the same metric function.
+_DETERMINISTIC_ALIASES = {
+    "deterministic", "deterministic-strict",
+    "deterministic-standard", "deterministic-bounded",
+}
 
 
 def default_threshold(algorithm_class: str) -> float:
@@ -49,18 +70,34 @@ def default_threshold(algorithm_class: str) -> float:
 # Per-class metric implementations
 # ----------------------------------------------------------------------------- #
 
-def parity_deterministic(reference: np.ndarray, candidate: np.ndarray) -> float:
-    """Element-wise tolerance; returns max absolute error.
+def parity_deterministic(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    rtol: float = 0.0,
+) -> float:
+    """Element-wise tolerance; returns the worst-case error.
 
-    Lower is better; pass iff max_abs_err < threshold (default 1e-13).
+    Without ``rtol``: returns ``max |reference - candidate|`` (absolute).
+    With ``rtol > 0``: returns ``max |reference - candidate| / (rtol·|reference| + tiny)``
+    — a relative max-error. Pass condition (in ``is_pass``) is
+    ``returned_value < threshold``.
+
+    Use the absolute mode (default) when all output values are O(1).
+    Use ``rtol`` when values span many orders of magnitude.
     """
-    reference = np.asarray(reference).ravel()
-    candidate = np.asarray(candidate).ravel()
+    reference = np.asarray(reference, dtype=np.float64).ravel()
+    candidate = np.asarray(candidate, dtype=np.float64).ravel()
     if reference.shape != candidate.shape:
         raise ValueError(
             f"shape mismatch: {reference.shape} vs {candidate.shape}"
         )
-    return float(np.max(np.abs(reference - candidate)))
+    abs_err = np.abs(reference - candidate)
+    if rtol <= 0.0:
+        return float(np.max(abs_err))
+    # tiny floor so rtol-mode on a reference of all zeros doesn't blow up
+    scale = rtol * np.abs(reference) + np.finfo(np.float64).tiny
+    return float(np.max(abs_err / scale))
 
 
 def parity_stochastic(reference: np.ndarray, candidate: np.ndarray) -> float:
@@ -190,14 +227,17 @@ def parity_inference(
 # ----------------------------------------------------------------------------- #
 
 _DISPATCH = {
-    "deterministic":  parity_deterministic,
-    "stochastic":     parity_stochastic,
-    "clustering":     parity_clustering,
-    "embedding":      parity_embedding,
-    "ranked":         parity_ranked,
-    "ordinal":        parity_ordinal,
-    "classification": parity_classification,
-    "inference":      parity_inference,
+    "deterministic":          parity_deterministic,
+    "deterministic-strict":   parity_deterministic,
+    "deterministic-standard": parity_deterministic,
+    "deterministic-bounded":  parity_deterministic,
+    "stochastic":             parity_stochastic,
+    "clustering":             parity_clustering,
+    "embedding":              parity_embedding,
+    "ranked":                 parity_ranked,
+    "ordinal":                parity_ordinal,
+    "classification":         parity_classification,
+    "inference":              parity_inference,
 }
 
 
@@ -227,13 +267,40 @@ def compute_parity(
 
 
 def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = None) -> bool:
-    """Apply the per-class direction (lower-better for deterministic, higher-better otherwise)."""
+    """Apply the per-class pass direction.
+
+    - Deterministic family: lower is better; pass iff metric_value < threshold.
+      A hard ceiling of `DETERMINISTIC_HARD_CEILING` (= 1e-6) is enforced — if
+      a port needs more than this for "deterministic" parity, the algorithm
+      class is wrong; switch to `ordinal` (Pearson) or `embedding` (Procrustes).
+
+    - Inference: dict with two keys; pass iff BOTH clear their own thresholds.
+
+    - Everything else: higher is better; pass iff metric_value >= threshold.
+    """
     threshold = threshold if threshold is not None else default_threshold(algorithm_class)
-    if algorithm_class == "deterministic":
+
+    if algorithm_class in _DETERMINISTIC_ALIASES:
+        if threshold > DETERMINISTIC_HARD_CEILING:
+            raise ValueError(
+                f"deterministic threshold {threshold:.2e} exceeds hard ceiling "
+                f"{DETERMINISTIC_HARD_CEILING:.2e}. "
+                "At this scale 'deterministic' has lost meaning — switch to "
+                "'ordinal' (Pearson) for monotonic / per-cell outputs or "
+                "'embedding' (Procrustes) for coordinate outputs."
+            )
         return float(metric_value) < threshold
+
     if algorithm_class == "inference":
         return (
             metric_value["spearman_neglog10p"] >= 0.90
             and metric_value["top50_jaccard"] >= 0.7
         )
+
+    # Ordinal: Pearson is bit-noisy on bit-equivalent inputs (~1 - 1e-15).
+    # Treat any value within 1e-12 of 1.0 as effectively perfect to avoid
+    # spurious failures from `pearsonr` internal rounding.
+    if algorithm_class == "ordinal":
+        return float(metric_value) >= threshold - 1e-12
+
     return float(metric_value) >= threshold

@@ -148,12 +148,12 @@ Agent 会端到端执行 6 步协议，最终产出：
 
 | # | 分类 | 一致性度量 | 默认阈值 | 例子 R 包 |
 |---|---|---|---|---|
-| 1 | **Deterministic numerical** | 元素级 `max_abs_err < tol` AND Pearson = 1 | `tol = 1e-13` (f64) | BandNorm, scHiCluster kernels |
+| 1 | **Deterministic numerical**（3 个子档，见 [PARITY_TAXONOMY.md](PARITY_TAXONOMY.md#deterministic-sub-tiers-class-1)） | 元素级 `max_abs_err < tol`，可选 `rtol` 缩放 | **standard `1e-8`** / strict `1e-13` / bounded `1e-6`；**硬上限 `1e-6`** | BandNorm, scHiCluster kernels |
 | 2 | **Stochastic numerical** | Kolmogorov–Smirnov ≤ τ 或 Wasserstein-1 ≤ τ | KS-p ≥ 0.05 | MCMC 抽样、贝叶斯后验 |
 | 3 | **Combinatorial clustering** | 标签不变：ARI / NMI / Fowlkes–Mallows | ARI ≥ 0.95 | mclust, scDblFinder, sc3 |
 | 4 | **Continuous embedding** | 旋转不变：Procrustes similarity | Procrustes ≥ 0.95 | Seurat CCA, PCA, UMAP, t-SNE |
 | 5 | **Ranked output** | top-K Jaccard / Spearman 相关 | top-50 Jaccard ≥ 0.8 | COSG markers, DE 排名 |
-| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman 相关 | Pearson ≥ 0.99 | Monocle 2, Slingshot, TSCAN |
+| 6 | **Ordinal output (pseudotime)** | Pearson / Spearman 相关 | Pearson ≥ 0.99（≥ `1 − 1e-12` 视为完美） | Monocle 2, Slingshot, TSCAN |
 | 7 | **Classification** | 标签一致 / F1 | F1 ≥ 0.95 | DoubletFinder, scDblFinder labels |
 | 8 | **Statistical inference** | rank corr on −log10 p + top-K Jaccard | Spearman ≥ 0.90 | miloR DA, limma, DESeq2, tradeSeq |
 
