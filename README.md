@@ -144,7 +144,7 @@ Each step is documented in detail:
 | **2 Dual environments** | Provision a Python target env (Python + in-progress port) and an R reference env (R 4.x + Bioconductor + upstream reference). Both see the same fixture files. | [SETUP.md](SETUP.md) |
 | **3 Two-agent inner loop** | (a) **Equivalence Agent**: translate R → Python, iterate until the pre-registered class-aware parity gate clears. (b) **Acceleration Agent**: verifier-guided test-time search over algebraic rewrites for speed, each requiring one of three admissibility proofs. | [PROTOCOL.md](PROTOCOL.md), [PARITY_TAXONOMY.md](PARITY_TAXONOMY.md), [ACCELERATION_PLAYBOOK.md](ACCELERATION_PLAYBOOK.md) |
 | **4 Validate** | Re-confirm the gate. The threshold is committed before agent work begins — never tightened or loosened. | [PARITY_TAXONOMY.md](PARITY_TAXONOMY.md) |
-| **5 Release** | Ship the wheel to PyPI, publish the repo under `github.com/<org>/py-X`, complete the structured `RECONSTRUCTION_REPORT.md` + three mandatory notebooks. | [NOTEBOOKS.md](NOTEBOOKS.md) |
+| **5 Release** | Ship the wheel to PyPI, publish the repo under `github.com/<org>/py-X`, complete the structured `RECONSTRUCTION_REPORT.md` + four mandatory notebooks. | [NOTEBOOKS.md](NOTEBOOKS.md) |
 
 ---
 
@@ -223,18 +223,23 @@ Wall-clock measurement rules:
 
 ---
 
-## Three mandatory notebooks per release
+## Four mandatory notebooks per release
 
-A finished port serves **four audiences**, each with a different need:
+A finished port serves **five audiences**, each with a different need:
 
 | Audience | What they need | Where they look |
 |---|---|---|
 | **Reviewer / scientist** evaluating whether to trust the port | Pipeline-level proof Python ≡ R numerically | [`compare_R_vs_Python.ipynb`](templates/compare_R_vs_Python.template.ipynb) |
 | **End user** new to the algorithm | A copy-pastable Python tour of every public function | [`tutorial_<dataset>.ipynb`](templates/tutorial.template.ipynb) |
 | **R user porting their existing code line-by-line** | A function-level dictionary — every R parameter ↔ Python parameter, side-by-side calls on identical input | [`function_by_function_R_parity.ipynb`](templates/function_by_function_R_parity.template.ipynb) |
+| **Auditor of the engineering process** asking "did the agent really iterate, or did it skip the loop?" | A per-iteration narrative log with one named subplot **per iteration** | [`evolution.ipynb`](templates/evolution.template.ipynb) |
 | **CI / automation** | The pre-registered parity gate as a pytest assertion | `tests/test_exact_match.py` |
 
-All three notebooks ship **pre-executed** so GitHub renders them without re-running. Phase 4 of the protocol blocks the port from being released if any one is missing.
+All four notebooks ship **pre-executed** so GitHub renders them without re-running. Phase 4 of the protocol blocks the port from being released if any one is missing.
+
+**`evolution.ipynb` is a forcing function.** It is structured as `## Iteration N — <title>` headers, **one per iteration**, each with a markdown narrative of what was changed AND a code cell that produces a subplot for that iteration. If the agent performed 100 iterations, the notebook has 100 subplots; if it skipped the acceleration loop entirely, the notebook still has one block for the baseline (`## Iteration 0 — Baseline translation`) — but the protocol then audits whether obvious acceleration opportunities were missed.
+
+The point is not to make the agent generate plots; the point is to make it **impossible to ship without a written record of every iteration** that touched the algorithm. The summary 2-panel `examples/evolution.png` (auto-generated from `ITERATION_LOG.md` by `engine.plot_evolution`) supplements but does not replace this notebook.
 
 📖 Schemas + section-by-section requirements: [NOTEBOOKS.md](NOTEBOOKS.md).
 
@@ -326,6 +331,7 @@ The agent then executes:
    - **`examples/compare_R_vs_Python.ipynb`** — pipeline parity
    - **`examples/tutorial_<dataset>.ipynb`** — Python-only function tutorial
    - **`examples/function_by_function_R_parity.ipynb`** — R⇄Python function dictionary
+   - **`examples/evolution.ipynb`** — per-iteration narrative + subplot (one block per iteration; forces the agent to record what each iteration did)
 7. **(Phase 5 — release)** Build wheel, push to PyPI; create GitHub repo + release; add the port as a seed template for future ports.
 
 **Always-first invariant**: Phase 0.5 (Discovery) is non-skippable. If discovery is skipped, the protocol fails — we risk re-implementing upstream work that already exists. The TSCAN port saved ~3000 LOC of Mclust code by finding `py-mclustR` mid-port; the next port should hit that win at Step 1, not by accident.
@@ -381,7 +387,7 @@ After the parity gate clears and the Acceleration loop terminates, the agent fil
 2. **R function coverage audit** — every exported R function from `NAMESPACE` is in the table (ported / skipped with reason). Auto-populated by `engine.r_function_audit`. Also lists **dependencies reused from omicverse** (ecosystem audit — how many LOC saved by reusing upstream py-mirrors).
 3. **Parity evidence** — per-output metric values, per-fixture wall-clock + parity, reproducible reference command.
 4. **Acceleration evidence** — two-panel evolution figure embedded, accepted-vs-rejected rewrites with admissibility proofs.
-5. **Code quality audit** — `pip install` + `pytest` green + three mandatory notebooks executed + license compatible + version pinned. **All non-skippable.**
+5. **Code quality audit** — `pip install` + `pytest` green + four mandatory notebooks executed + license compatible + version pinned. **All non-skippable.**
 6. **Known limitations** — honest list of what the port doesn't do; never used as an excuse to widen the gate.
 7. **Integration into omicverse** — vendor location, public-API exposure, tutorial slot.
 8. **Sign-off** — author, date, active time spent, final audit class.
@@ -401,7 +407,8 @@ The protocol grew by patching anti-patterns surfaced during real ports. Each ver
 | v3 | Added [`DISCOVERY.md`](DISCOVERY.md) (Phase 0.5) + `engine/discover_omicverse_deps.py` | py-TSCAN discovered `py-mclustR` mid-port by luck; protocol now forces this check at Step 1. |
 | v4 | Added [`NOTEBOOKS.md`](NOTEBOOKS.md) — two mandatory notebooks (`compare_R_vs_Python`, `tutorial_<dataset>`) | py-TSCAN-v0.1 deferred them and shipped without; v0.2 added them retroactively. |
 | v5 | Added Notebook 3 (`function_by_function_R_parity`) — R⇄Python parameter dictionary | The first two notebooks didn't cover R users line-by-line porting their own code. |
-| v6 (now) | Genericised env names (`PYTHON_TEST_ENV` / `R_TEST_ENV`) + `REBUILDR_ORG` env var + [`SETUP.md`](SETUP.md) + [`engine/smoke_test.py`](engine/smoke_test.py) + `requirements.txt` + portable-paths sweep | Portability audit surfaced that a second user couldn't clone-and-go without grepping the kit for hardcoded paths. |
+| v6 | Genericised env names (`PYTHON_TEST_ENV` / `R_TEST_ENV`) + `REBUILDR_ORG` env var + [`SETUP.md`](SETUP.md) + [`engine/smoke_test.py`](engine/smoke_test.py) + `requirements.txt` + portable-paths sweep | Portability audit surfaced that a second user couldn't clone-and-go without grepping the kit for hardcoded paths. |
+| v7 (now) | Added Notebook 4 (`evolution.ipynb`) — per-iteration narrative + subplot, one block per iteration | Audit of nine shipped ports surfaced that 8/9 had no `evolution.png` and no `ITERATION_LOG.md`. The summary plot was easy to skip silently; the per-iteration notebook makes skipping it visible (a missing notebook is louder than a missing PNG). The notebook is a forcing function: every iteration that touched the algorithm must have a named section. |
 
 ---
 

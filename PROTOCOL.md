@@ -180,11 +180,12 @@ Each finished port:
   - Per-fixture parity values;
   - The two-plot evolution figure (`python -m engine.plot_evolution --port-dir .`);
   - Accepted-vs-rejected Acceleration rewrites with admissibility evidence;
-- ships **all three** mandatory notebooks under `examples/` (see [NOTEBOOKS.md](NOTEBOOKS.md)):
+- ships **all four** mandatory notebooks under `examples/` (see [NOTEBOOKS.md](NOTEBOOKS.md)):
   - **`compare_R_vs_Python.ipynb`** — pipeline-level parity vs R on the canonical fixture, with one visualisation per `manifest.yaml::outputs[]` block. Pre-executed, outputs committed.
   - **`tutorial_<dataset>.ipynb`** — Python-only walkthrough, one subsection per public function from §2.2 of the reconstruction report, plus class-API mirror and pitfalls. Pre-executed, outputs committed.
   - **`function_by_function_R_parity.ipynb`** — function-level R⇄Python dictionary on the same input, with a parameter table per function (every R param documented in R name / Py name / type / default / range / description), R-call markdown + Py-call code + numerical comparison + sub-verdict. Pre-executed, outputs committed.
-  - None of the three is "deferrable" — if any is missing, the port is not released. TSCAN-v0.1 shipped without Notebooks 1+2; v0.2 added them; v0.3 added Notebook 3. The protocol now blocks all three from being skipped.
+  - **`evolution.ipynb`** — per-iteration narrative: one `## Iteration N — <title>` header per iteration, each with a markdown body describing what changed and a code cell producing a subplot for that iteration. Final cell renders the aggregate 2-panel `evolution.png` inline. Pre-executed, outputs committed. Minimum 2 iteration blocks (Baseline + at least one follow-up); the header count is a quality signal — a port claiming heavy work but showing only 2 headers should fail review.
+  - None of the four is "deferrable" — if any is missing, the port is not released. TSCAN-v0.1 shipped without Notebooks 1+2; v0.2 added them; v0.3 added Notebook 3; the 9-port batch audit (2026-05-24) surfaced that 8/9 ports had no iteration record, so v7 of the protocol adds Notebook 4. The protocol now blocks all four from being skipped.
 - gets a `omicverse/py-<pkg>` repository created;
 - has its `pyproject.toml` version pinned to `0.1.0`;
 - is published to PyPI under MIT or the upstream R package's license (whichever is more restrictive — match upstream when possible);

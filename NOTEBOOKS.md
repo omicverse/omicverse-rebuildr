@@ -1,19 +1,20 @@
 # Notebooks — Required Deliverables
 
-> Every port ships **three pre-executed notebooks** under `examples/`. These are NOT optional. The protocol started with two (v2), then a third was added (v3) after the py-TSCAN port surfaced that the first two don't cover users migrating R code line-by-line.
+> Every port ships **four pre-executed notebooks** under `examples/`. These are NOT optional. The protocol started with two (v2), a third was added in v3, and a fourth (`evolution.ipynb`) was added in v7 after a 9-port audit surfaced that 8 of 9 ports shipped with no iteration record.
 
-## Why three are required
+## Why four are required
 
-A port has four audiences:
+A port has five audiences:
 
 | Audience | What they need | Where they look |
 |---|---|---|
 | **Reviewer / scientist** evaluating whether to trust the port | Visual side-by-side proof that Python ≡ R numerically at the pipeline level | Notebook 1 |
 | **End user** new to the algorithm, wants a Python walkthrough | A copy-pastable tour of every public function | Notebook 2 |
 | **R user porting their existing code** to Python | A function-level dictionary: every R parameter → Python parameter, with worked side-by-side calls | Notebook 3 |
+| **Auditor of the engineering process** asking "did the agent really iterate, or did it skip the loop?" | A per-iteration narrative log, one section per iteration, each with a plot | **Notebook 4 (`evolution.ipynb`)** |
 | **CI / automation** | The pre-registered parity gate | `tests/test_exact_match.py` |
 
-The parity test gives a numerical PASS/FAIL. The reviewer can't audit it by eye. The notebooks make the parity **visible**, the API **legible**, and the **R→Python translation** mechanical.
+The parity test gives a numerical PASS/FAIL. The reviewer can't audit it by eye. The notebooks make the parity **visible**, the API **legible**, the **R→Python translation** mechanical, and the **iteration history auditable**.
 
 ## Notebook 1 — `compare_R_vs_Python.ipynb`
 
@@ -174,14 +175,66 @@ This is different from Notebooks 1 and 2:
 
 **Pre-execution requirement**: same as Notebooks 1 and 2. Re-run before each release.
 
+## Notebook 4 — `evolution.ipynb`
+
+**Purpose**: a per-iteration narrative + visualisation of every iteration the agent performed against this port. Makes the iteration history **auditable** by an outside reviewer.
+
+This is the forcing function for the iteration record. A summary 2-panel `examples/evolution.png` (auto-generated from `ITERATION_LOG.md` by `engine.plot_evolution`) is easy to skip silently; a missing **notebook** is louder. The notebook also forces a written narrative per iteration, not just a row in a YAML log.
+
+**Hard structure rule (non-negotiable)**:
+
+```
+## Iteration 0 — Baseline translation
+<markdown narrative: what was implemented, what was hard, what works>
+<code cell: load fixture, run baseline, measure wall-clock + parity, emit subplot>
+
+## Iteration 1 — <one-line title of the rewrite or fix>
+<markdown narrative: what changed and WHY, expected effect, admissibility proof if (B)>
+<code cell: re-run, measure, emit subplot>
+
+## Iteration 2 — <title>
+...
+
+## Aggregate evolution figure
+<code cell: re-render the 2-panel time-vs-iter + parity-vs-iter from ITERATION_LOG.md>
+```
+
+**Rules**:
+
+1. **One `## Iteration N — title` header per iteration.** If you did 100 iterations, there are 100 such headers. If your port is class A and the only change after the baseline was "ported function X, then function Y, then function Z", each of those is an iteration and gets its own header. **The header count is itself a quality signal**: a port claiming "this was easy, 1 day of work" but showing only 2 headers should raise a red flag in review.
+
+2. **The markdown body before each code cell MUST describe what that iteration did.** Suggested ~3–6 sentences:
+   - What concretely changed in the code (function `X`, method `Y`, algorithm step `Z`)?
+   - Why? (parity gap surfaced by test, suspected R-Py divergence, acceleration candidate from playbook, …)
+   - What was the admissibility class if this was an acceleration rewrite (E / B / C)?
+   - What was the expected effect on wall-clock and on parity metric?
+   - **Cross-link** to the matching `ITERATION_LOG.md` entry (e.g., `[ITER_LOG ↩](../ITERATION_LOG.md#iter-7)`).
+
+3. **The code cell MUST produce a subplot for that iteration.** Recommended content:
+   - Wall-clock vs iteration so far (line plot with horizontal markers for the threshold)
+   - Parity metric vs iteration so far (line plot with red-dashed threshold line; this iteration's point highlighted)
+   - **Even baselines** (no acceleration) get a subplot — the point is provenance, not optimisation.
+
+4. **The final cell renders the aggregate 2-panel evolution figure.** This is the same one `engine.plot_evolution` writes to `examples/evolution.png`; render it inline in the notebook AND save it to disk.
+
+5. **Class A ports must still have at least 2 iterations**: `## Iteration 0 — Baseline` + `## Iteration 1 — <final touch / validation pass>`. If the only thing in the iteration history is "I ported it once and shipped" — that's a 1-iteration port, which is allowed, but the notebook still has one block describing the design decisions made during the single pass.
+
+**Anti-pattern this catches**:
+
+> "I ran the acceleration loop 12 times, kept the 1 successful rewrite, threw away the other 11 rejections, and only logged the survivor in ITERATION_LOG.md."
+
+The notebook forces ALL 12 to appear as separate headers, with the rejected ones marked `status: rejected` in their YAML log entry and explained in the markdown body ("This rewrite broke parity from Pearson 0.9999 to 0.9870 with no closed-form ε bound, so it was rejected per the rebuildr (B) admissibility rule."). Rejection narratives are as valuable as acceptances.
+
+**Pre-execution requirement**: same as Notebooks 1–3.
+
 ## Optional extra notebooks
 
 For larger ports (class C or multi-feature like Monocle 2):
 
 - `tutorial_<larger_dataset>.ipynb` — same content as Notebook 2 but on a more realistic dataset, demonstrating scale (e.g., paul15 → pancreas → neuroectoderm).
-- `acceleration_walkthrough.ipynb` — for class C ports, a notebook showing each Acceleration Agent rewrite with timing + parity diff at every step (i.e., a richer version of `ITERATION_LOG.md` with plots).
+- `visualization_R_parity.ipynb` — side-by-side R ggplot vs Python ggplot2-python renders, for ports with a plotting module. (Useful when the port has a non-trivial visualisation surface.)
 
-These are nice-to-haves; the three above are **mandatory**.
+These are nice-to-haves; **the four above are mandatory**.
 
 ## File-naming convention
 
@@ -190,6 +243,8 @@ examples/
 ├── compare_R_vs_Python.ipynb              ← Notebook 1 — pipeline parity
 ├── tutorial_<dataset>.ipynb               ← Notebook 2 — Python function tutorial
 ├── function_by_function_R_parity.ipynb    ← Notebook 3 — R⇄Python per-function dictionary
+├── evolution.ipynb                        ← Notebook 4 — per-iteration narrative + subplots (one block per iteration)
+├── evolution.png                          ← 2-panel aggregate (auto-generated by engine.plot_evolution)
 ├── r_per_function_dump.R                  ← R driver that dumps per-function outputs for Notebook 3
 ├── *.executed.ipynb                       ← pre-executed copies for GitHub preview (optional)
 ├── data/                                  ← small fixture copies
@@ -204,6 +259,7 @@ See:
 - [templates/compare_R_vs_Python.template.ipynb](templates/compare_R_vs_Python.template.ipynb) — Notebook 1
 - [templates/tutorial.template.ipynb](templates/tutorial.template.ipynb) — Notebook 2
 - [templates/function_by_function_R_parity.template.ipynb](templates/function_by_function_R_parity.template.ipynb) — Notebook 3
+- [templates/evolution.template.ipynb](templates/evolution.template.ipynb) — Notebook 4
 - [templates/r_per_function_dump.template.R](templates/r_per_function_dump.template.R) — R driver for Notebook 3
 
 ## What CHECKLIST.md must enforce
@@ -213,11 +269,16 @@ Phase 4 has these as **non-skippable** ticks:
 - [ ] `examples/compare_R_vs_Python.ipynb` exists AND has been executed end-to-end in a fresh kernel AND every parity sub-gate clears AND outputs are committed.
 - [ ] `examples/tutorial_<dataset>.ipynb` exists AND covers every public function from RECONSTRUCTION_REPORT §2.2 AND has been executed AND outputs are committed.
 - [ ] `examples/function_by_function_R_parity.ipynb` exists AND has one subsection per public R function AND every R parameter is in a documented table AND R and Python outputs are numerically compared per function AND has been executed AND outputs are committed.
+- [ ] `examples/evolution.ipynb` exists AND has **one `## Iteration N — <title>` header per iteration** AND every iteration block contains markdown narrative describing what changed AND a code cell that produces a subplot for that iteration AND has been executed AND outputs are committed. Minimum 2 iteration blocks (`## Iteration 0 — Baseline` + at least one follow-up); ports with N >2 acceleration loop attempts have N+1 blocks.
 
-If any of the three is missing, the port is **not released**. No "deferred" exception.
+If **any of the four is missing**, the port is **not released**. No "deferred" exception.
 
 ## Anti-patterns
 
 The py-TSCAN-v0.1 port marked Notebooks 1 and 2 as `⏳ deferred` in §5 of its first reconstruction report. This was the protocol failing — `deferred` should not have been a valid state for these items in Phase 4. v0.2 added them retroactively.
 
-Then v0.2 still didn't have Notebook 3 — the protocol was missing the R⇄Python function-level dictionary entirely. v0.3 adds it. Lesson: every audience identified in [§Why three are required] must have a deliverable, or the protocol leaks.
+Then v0.2 still didn't have Notebook 3 — the protocol was missing the R⇄Python function-level dictionary entirely. v0.3 adds it.
+
+Then a port-batch audit (Phase: 9 trajectory ports, 2026-05-24) surfaced that 8/9 ports had no `evolution.png` and no `ITERATION_LOG.md`. The summary plot was easy to skip silently. v0.4 of this doc (= v7 of the protocol) adds Notebook 4 (`evolution.ipynb`): a missing notebook is louder than a missing PNG, and the **one-header-per-iteration** rule makes iteration count auditable at a glance.
+
+Lesson — every audience identified in [§Why N are required] must have a deliverable, or the protocol leaks.

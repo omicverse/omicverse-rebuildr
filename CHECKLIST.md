@@ -103,9 +103,9 @@ These items are **non-skippable**. "Deferred" is not a valid status in Phase 4.
 - [ ] `examples/compare_R_vs_Python.ipynb` exists, follows the 6-section schema, runs end-to-end in a fresh kernel, every parity sub-gate clears, executed outputs committed.
 - [ ] `examples/tutorial_<dataset>.ipynb` exists, has one subsection per public function from RECONSTRUCTION_REPORT §2.2, includes the class-API mirror + pitfalls + next-steps sections, executed outputs committed.
 - [ ] `examples/function_by_function_R_parity.ipynb` exists, has one subsection per public R function with a parameter table (R name → Py name → type → default → range → description for EVERY parameter), R-call markdown + Py-call code + numerical comparison + sub-verdict, plus an aggregate verdict table; executed outputs committed.
+- [ ] `examples/evolution.ipynb` exists, has **one `## Iteration N — <title>` header per iteration** (N ≥ 2; class A still needs Baseline + at least one follow-up). Every iteration block contains a markdown narrative (≥ 3 sentences) describing what changed and why, AND a code cell that produces a subplot for that iteration. Final cell renders the aggregate 2-panel `examples/evolution.png`. Executed outputs committed.
 - [ ] `examples/r_per_function_dump.R` exists, dumps per-function R outputs to JSON for Notebook 3 to consume.
-- [ ] (Class C ports only — optional) `examples/acceleration_walkthrough.ipynb` showing each rewrite with parity + timing.
-- [ ] Re-execute all three notebooks immediately before release: `jupyter nbconvert --to notebook --execute examples/*.ipynb --output {}`.
+- [ ] Re-execute all four notebooks immediately before release: `jupyter nbconvert --to notebook --execute examples/*.ipynb --output {}`.
 
 ### Reconstruction report (the structured "done" artefact)
 
@@ -113,7 +113,7 @@ These items are **non-skippable**. "Deferred" is not a valid status in Phase 4.
 - [ ] Run `python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkgname> --output AUDIT.md`; paste §2 R-function coverage table into the report.
 - [ ] Fill §1 Identity (versions, audit class A/B/C, final parity).
 - [ ] Fill §3 Parity evidence — list every output's metric and threshold; one row per fixture.
-- [ ] Embed `examples/evolution.png` in §4.1.
+- [ ] Embed `examples/evolution.png` in §4.1 AND link to `examples/evolution.ipynb` for the per-iteration narrative.
 - [ ] Fill §4.2 Accepted rewrites table from `ITERATION_LOG.md`; §4.3 Rejected rewrites with reasons.
 - [ ] Confirm §5 Code-quality checks are all ✅.
 - [ ] List §6 Known limitations honestly.
