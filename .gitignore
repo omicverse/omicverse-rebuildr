@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Jupyter autosave artefacts — these are duplicates of committed notebooks
+# and create misleading "broken link" reports during portability audits.
+.ipynb_checkpoints/
+
+# Cached omicverse repo list (regenerated on demand, 24h TTL)
+engine/omicverse_repos.cache.json
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store

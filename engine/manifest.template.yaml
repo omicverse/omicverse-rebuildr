@@ -1,0 +1,62 @@
+# Pre-registered parity gate for `py-<pkg>`
+#
+# COMMIT THIS BEFORE THE AGENT LOOP BEGINS.
+# These fields are READ-ONLY after the Acceleration Agent starts.
+# Do not tighten or loosen `parity_threshold` to make a port pass.
+
+package: py-<PkgName>
+upstream:
+  name: <UpstreamR>                    # e.g., DoubletFinder, Slingshot, TSCAN, tradeSeq
+  version: "1.2.3"                     # pinned upstream version
+  source: <CRAN | Bioconductor | GitHub>
+  url: https://github.com/<user>/<repo>
+
+# Pick ONE algorithm class from PARITY_TAXONOMY.md:
+#   deterministic | stochastic | clustering | embedding |
+#   ranked        | ordinal    | classification | inference
+algorithm_class: ordinal
+
+# Threshold from PARITY_TAXONOMY.md defaults — change only with written justification.
+parity_threshold: 0.99
+
+# Canonical fixture — small, public, deterministic.
+fixture:
+  path: data/fixture_<dataset>.h5ad    # cells x genes AnnData, raw counts in .X
+  source: <publicly-resolvable URL or scanpy.datasets.<name>()>
+  description: "<one line>"
+  expected_shape: [<n_cells>, <n_genes>]
+
+# How the R reference is invoked. The harness runs:
+#   Rscript <reference_command> <fixture.path> <output.json>
+reference_command: tests/r_reference_driver.R
+
+# RNG seed. Both ref_runner.R and parity_test.py must set this BEFORE invoking the algorithm.
+seed: 42
+
+# What output(s) are compared. For single-output algorithms, one block.
+# For multi-output (e.g., embedding + clusters + DE), add more blocks; ALL must pass.
+outputs:
+  - name: pseudotime
+    type: "1d vector"
+    location_reference: "$.Pseudotime"            # JSON path in reference_output.json
+    location_candidate: "adata.obs['Pseudotime']"  # how to find it in the candidate AnnData
+    metric: pearson
+    threshold: 0.99
+
+# Optional held-out fixture for v1.1 hidden-fixture scoring.
+held_out_fixture:
+  path: null
+  description: null
+
+# Acceleration Agent restrictions
+acceleration:
+  enabled: true            # set false for class-A translation-only ports
+  max_iterations: 20
+  must_pass_gate: true     # rewrites that break the gate are rolled back
+
+# Audit class — fill AFTER the port is done (A / B / C from Omicverse-RebuildR §5.1.1)
+audit_class: null
+
+# Provenance
+created_by: <agent or human handle>
+created_at: <YYYY-MM-DD>

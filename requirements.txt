@@ -1,0 +1,26 @@
+# omicverse-rebuildr kit — Python deps for the engine scripts + the three notebooks.
+# Install in your Python target env:
+#   pip install -r requirements.txt
+#
+# Versions are the lowest tested; newer should be fine.
+
+# Engine (parity metrics, benchmark, plot, R-function audit, discovery)
+numpy>=1.23
+scipy>=1.10
+pandas>=1.5
+scikit-learn>=1.2
+networkx>=3.0
+pyyaml>=6.0
+matplotlib>=3.6
+
+# Notebook rendering (Phase 4 mandatory deliverables)
+jupyter>=1.0
+nbformat>=5.10
+ipykernel>=6.0
+
+# Reading R-side outputs / fixtures
+pyreadr>=0.5         # *.rds → pandas
+anndata>=0.9         # AnnData containers shared with scanpy
+
+# Trajectory-DE port-specific (used by Notebook 3 of py-TSCAN; optional)
+# pygam>=0.9
