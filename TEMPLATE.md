@@ -239,3 +239,26 @@ htmlcov/
 | Statistical inference | `py-miloR` |
 | Embedding | `py-CCA` |
 | Deterministic | `rust-bandnorm` |
+| Multi-stage pipeline with a Seurat dependency | [`py-spatialecotyper`](https://github.com/omicverse/py-spatialecotyper) |
+
+`py-spatialecotyper` is the seed to copy when the upstream package is a
+*pipeline* rather than a single algorithm, and especially when it leans on
+Seurat or on R's RNG. What to lift from it:
+
+* `tests/r_reference_driver.R` — a stage-by-stage dump (one artefact per
+  pipeline step) so a parity failure localises to one function instead of
+  propagating. Portable dump conventions: sparse -> MatrixMarket + two dimname
+  files, dense -> gzipped TSV + dimname files, data.frame -> TSV with a
+  `.rowname` column, everything else -> `jsonlite::write_json(..., digits = NA)`.
+* `tests/stage_check.py` — the development harness that feeds each Python
+  function *R's own input for that stage*.
+* `pyspatialecotyper/rrandom.py` — R's Mersenne-Twister, `R_unif_index`
+  rejection sampler and inversion `rnorm`, verified bit-identical. Copy this
+  verbatim for any port whose R original calls `sample()`, `runif()` or
+  `rnorm()`; it converts stochastic outputs into deterministic, diffable ones.
+* `pyspatialecotyper/_modularity.py` — Seurat's `ComputeSNN` and
+  `ModularityOptimizer.cpp` (including its `JavaRandom` LCG), so `FindClusters`
+  reproduces Seurat's Louvain exactly rather than approximately.
+* The habit of measuring **R against itself** before gating: four of this
+  port's outputs turned out to be irreproducible run-to-run in R, and knowing
+  that changed which gate was honest.
