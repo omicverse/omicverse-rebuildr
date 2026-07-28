@@ -131,6 +131,38 @@ def plot(entries: list[IterEntry], output: Path, threshold: float | None = None)
                   linewidth=1.5, markersize=7)
         ax_a.set_ylim(min(min(ya), (threshold or 0.99)) - 0.005,
                       max(ya) + 0.002)
+
+    # Rejected iterations are part of the record too: a rewrite that was tried
+    # and rolled back is evidence about the search, and a rejection caused by a
+    # parity drop is exactly the kind of dip Plot 2 exists to show. Draw them as
+    # hollow red markers so they are visibly off the accepted trajectory.
+    rejected = [e for e in entries
+                if e.status not in ("baseline", "ACCEPT") and e.parity_metric is not None]
+    if rejected:
+        ax_a.plot([e.iter for e in rejected], [e.parity_metric for e in rejected],
+                  linestyle="none", marker="o", markerfacecolor="none",
+                  markeredgecolor="#a4262c", markersize=9, markeredgewidth=1.6,
+                  label="rejected / rolled back")
+        for e in rejected:
+            note = (e.math_reason_for_dip or "").strip().split("\n", 1)[0]
+            ax_a.annotate(f"{e.status}: {e.action or ''}".strip(),
+                          (e.iter, e.parity_metric),
+                          textcoords="offset points", xytext=(8, -12),
+                          fontsize=7, color="#a4262c")
+            if note:
+                ax_a.annotate(note, (e.iter, e.parity_metric),
+                              textcoords="offset points", xytext=(8, -22),
+                              fontsize=6, color="#a4262c")
+        rej_t = [(e.iter, e.wall_clock_mean_s) for e in rejected
+                 if e.wall_clock_mean_s is not None]
+        if rej_t:
+            ax_t.plot([i for i, _ in rej_t], [t for _, t in rej_t],
+                      linestyle="none", marker="o", markerfacecolor="none",
+                      markeredgecolor="#a4262c", markersize=9, markeredgewidth=1.6)
+        lo = min([e.parity_metric for e in rejected] +
+                 [a for a in accs if a is not None] + [threshold or 0.99])
+        ax_a.set_ylim(lo - 0.01, max([a for a in accs if a is not None] + [0]) + 0.005)
+
     ax_a.set_ylabel("Parity metric")
     ax_a.set_xlabel("Iteration")
     ax_a.grid(True, alpha=0.25)

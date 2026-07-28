@@ -112,6 +112,12 @@ def reachable_helpers(
 
 PY_DEF_PAT = re.compile(r"^\s*def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.M)
 PY_CLASS_METHOD_PAT = re.compile(r"^\s{4}def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", re.M)
+# Module-level aliases (`old_name = new_name`) are a normal way to expose a
+# second spelling of a ported function -- e.g. the literal transliteration of an
+# R name alongside the idiomatic Python one. Without this, such aliases
+# false-negative in the coverage table.
+PY_ALIAS_PAT = re.compile(
+    r"^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[A-Za-z_][A-Za-z0-9_.]*\s*(?:#.*)?$", re.M)
 
 
 def parse_py_package(py_dir: Path) -> set[str]:
@@ -123,6 +129,7 @@ def parse_py_package(py_dir: Path) -> set[str]:
         text = py_file.read_text(errors="replace")
         names.update(PY_DEF_PAT.findall(text))
         names.update(PY_CLASS_METHOD_PAT.findall(text))
+        names.update(PY_ALIAS_PAT.findall(text))
     return names
 
 
@@ -130,11 +137,18 @@ def r_name_to_py_candidates(r_name: str) -> list[str]:
     """Generate plausible Python-style equivalents for an R name."""
     # camelCase → snake_case
     snake = re.sub(r"(?<!^)(?=[A-Z])", "_", r_name).lower()
+    # acronym-aware camelCase → snake_case: keep runs of capitals together, so
+    # SNF2 → snf2, PreprocessST → preprocess_st, NMFGenerateW → nmf_generate_w.
+    # Without this, every R name containing an acronym false-negatives.
+    acr = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", r_name)
+    acr = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", acr).lower()
+    acr_nodigit = re.sub(r"_(?=\d)", "", acr)
     # dot → underscore
     snake_dot = r_name.replace(".", "_")
     # numeric suffix _v3 etc.
     no_suffix = re.sub(r"_v\d+$", "", snake)
-    return list({r_name, snake, snake_dot, no_suffix, snake.replace(".", "_")})
+    return list({r_name, r_name.lower(), snake, acr, acr_nodigit, snake_dot,
+                 no_suffix, snake.replace(".", "_"), acr.replace(".", "_")})
 
 
 # ----------------------------------------------------------------------------- #
