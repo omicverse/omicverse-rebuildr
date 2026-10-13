@@ -40,6 +40,8 @@ py-<pkg>/
 ├── data/                      # Reference fixtures (small — gitignored if large)
 │   └── manifest.yaml          # Pre-registered parity gate (see engine/manifest.template.yaml)
 │
+├── port.yaml                  # omicverse.org catalog manifest: upstream + R⇄Python function map (see §port.yaml)
+│
 ├── <pkg>-ref/                 # Cloned upstream R source for inspection (gitignored)
 │   ├── R/
 │   ├── DESCRIPTION
@@ -103,6 +105,27 @@ See [templates/pyproject.template.toml](templates/pyproject.template.toml).
 See [engine/manifest.template.yaml](engine/manifest.template.yaml).
 
 Committed to the repo **before** Step 3 (the agent loop) begins.
+
+## `port.yaml` (omicverse.org catalog manifest)
+
+See [templates/port.template.yaml](templates/port.template.yaml) and the spec in
+[omicverse-org-home/docs/PORT_MANIFEST.md](https://github.com/omicverse/omicverse-org-home/blob/main/docs/PORT_MANIFEST.md).
+
+One file at the repo root, schema `omicverse-port/v1`: upstream package (name / source / version /
+citation), where the port surfaces in omicverse, the parity verdict, and **one `functions[]` entry per
+exported R function** (`r`, `py`, `status: ported|partial|planned|skipped`, `parity: exact|approx|…`,
+`note`). The website at https://omicverse.org/ports.html is generated from these files nightly —
+a port without `port.yaml` shows up as an "auto" row inferred from its README.
+
+Generate / refresh it from the audit (never write the function list by hand twice):
+
+```bash
+python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkgname> \
+    --output AUDIT.md --port-yaml port.yaml --domain <domain> --upstream-source <CRAN|Bioconductor|GitHub>
+```
+
+Re-running keeps hand-written `note` / `parity` / `test` / `aliases` and any `skipped` / `partial`
+status; it only appends newly discovered exports and promotes `planned` → `ported`.
 
 ## `tests/test_exact_match.py` (the parity gate as a unit test)
 
@@ -172,7 +195,7 @@ Skeleton (see [templates/README.template.md](templates/README.template.md)):
 2. Install (`pip install py-<pkg>`).
 3. Quickstart (class API).
 4. Low-level functional API (R one-to-one mirror).
-5. **What's included** table (Python ⇄ R function map).
+5. **What's included** table (Python ⇄ R function map — must agree with `port.yaml::functions`).
 6. **Reproducing R results exactly** — a code block that runs the parity test from the user's side.
 7. Relationship to omicverse.
 8. Citation.

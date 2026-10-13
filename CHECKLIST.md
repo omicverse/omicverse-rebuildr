@@ -92,6 +92,7 @@ After stopping:
 - [ ] `pip install -e .` in a **fresh** conda env succeeds.
 - [ ] `pytest -q` is green in that fresh env.
 - [ ] `README.md` has: Install / Quickstart / Function-map table / Reproducing-R section / Citation / License.
+- [ ] `port.yaml` exists at the repo root, parses (`python -c "import yaml; yaml.safe_load(open('port.yaml'))"`), and its `functions[]` agrees with the README function-map table.
 - [ ] `MATH.md` lists every (B) bounded-approximation rewrite with its perturbation bound.
 - [ ] Version pinned in `pyproject.toml` to `0.1.0`.
 - [ ] License chosen per [TEMPLATE.md §License decision matrix](TEMPLATE.md#license-decision-matrix).
@@ -110,7 +111,8 @@ These items are **non-skippable**. "Deferred" is not a valid status in Phase 4.
 ### Reconstruction report (the structured "done" artefact)
 
 - [ ] Copy [templates/RECONSTRUCTION_REPORT.template.md](templates/RECONSTRUCTION_REPORT.template.md) into the port as `RECONSTRUCTION_REPORT.md`.
-- [ ] Run `python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkgname> --output AUDIT.md`; paste §2 R-function coverage table into the report.
+- [ ] Run `python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkgname> --output AUDIT.md --port-yaml port.yaml --domain <domain> --upstream-source <CRAN|Bioconductor|GitHub>`; paste §2 R-function coverage table into the report.
+- [ ] Review `port.yaml` (root): fill `upstream.citation`, `omicverse.module`, `parity.status` / `value`; mark every unported export `skipped` (with a reason) or `planned`; add `note` / `parity` per function where known. This file feeds https://omicverse.org/ports.html — see [templates/port.template.yaml](templates/port.template.yaml).
 - [ ] Fill §1 Identity (versions, audit class A/B/C, final parity).
 - [ ] Fill §3 Parity evidence — list every output's metric and threshold; one row per fixture.
 - [ ] Embed `examples/evolution.png` in §4.1 AND link to `examples/evolution.ipynb` for the per-iteration narrative.

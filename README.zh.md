@@ -258,7 +258,7 @@ Acceleration Agent 提交的每一个代数重写都必须带下面其中一种�
 | `discover_omicverse_deps.py` | 通过 `gh repo list <org>` 列已有 org repo（默认 `omicverse`，可用 `REBUILDR_ORG` env var 覆盖）；解析 R `DESCRIPTION`；报告哪些依赖已有 py-镜像。24h 缓存。 | `python -m engine.discover_omicverse_deps --check <RPkg>` |
 | `parity_metrics.py` | 8 类 parity 度量函数（Pearson、ARI、Procrustes、KS、top-K Jaccard…）+ 类分发器。 | `from parity_metrics import compute_parity, is_pass` |
 | `benchmark.py` | 墙钟计时器，去热启动 + 3 次取平均；CV > 10% 自动延到 5 次取中位。 | `from benchmark import time_callable` |
-| `r_function_audit.py` | 解析 R `NAMESPACE` + `R/*.R`，审计 Python 覆盖率，产出 `AUDIT.md`。 | `python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkg>` |
+| `r_function_audit.py` | 解析 R `NAMESPACE` + `R/*.R`，审计 Python 覆盖率，产出 `AUDIT.md`；加 `--port-yaml` 时同时生成 / 刷新根目录 `port.yaml`（omicverse.org port 目录页的清单）。 | `python -m engine.r_function_audit --r-source <pkg>-ref --py-package <pkg> --output AUDIT.md --port-yaml port.yaml` |
 | `plot_evolution.py` | 从 `ITERATION_LOG.md` 渲染双图 PNG，accuracy 凹点处自动标数学原因。 | `python -m engine.plot_evolution --port-dir <path>` |
 | `loop.py` | Omicverse-RebuildR 循环的 runnable 形式 — equivalence + acceleration phase 作为 Python callable。 | `python -m engine.loop --port-dir <path> --phase equivalence` |
 | `manifest.template.yaml` | 预注册 parity gate 规范 — 拷到每个新 port 的 `data/manifest.yaml`。 | （文件模板） |
@@ -277,6 +277,7 @@ Acceleration Agent 提交的每一个代数重写都必须带下面其中一种�
 | `DISCOVERY.template.md` | port 的 `DISCOVERY.md` artefact（Phase 0.5） |
 | `ITERATION_LOG.template.md` | port 的 `ITERATION_LOG.md`（Phase 3 acceleration log） |
 | `RECONSTRUCTION_REPORT.template.md` | port 的 `RECONSTRUCTION_REPORT.md`（8 节最终报告） |
+| `port.template.yaml` | port 根目录的 `port.yaml`（omicverse.org 目录页清单：上游包 + R⇄Python 函数对照；通常由 `engine.r_function_audit --port-yaml` 生成后人工校对） |
 | `compare_R_vs_Python.template.ipynb` | Notebook 1 — pipeline parity |
 | `tutorial.template.ipynb` | Notebook 2 — Python tutorial |
 | `function_by_function_R_parity.template.ipynb` | Notebook 3 — R⇄Python 函数字典 |
@@ -316,6 +317,7 @@ Agent 然后执行：
    - `RECONSTRUCTION_REPORT.md`（8 节，从每阶段产物填）
    - `MATH.md`（任何 (B) 重写的扰动上界）
    - `AUDIT.md`（R 函数覆盖率，`engine.r_function_audit` 自动生成）
+   - `port.yaml`（根目录；R⇄Python 函数对照 + 上游元数据，喂给 https://omicverse.org/ports.html ，`engine.r_function_audit --port-yaml` 生成后人工校对）
    - `examples/evolution.png`（双图 time + accuracy，`engine.plot_evolution` 自动生成）
    - **`examples/compare_R_vs_Python.ipynb`** — pipeline parity
    - **`examples/tutorial_<dataset>.ipynb`** — Python-only 函数教程

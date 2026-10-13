@@ -1,0 +1,58 @@
+# port.yaml — machine-readable manifest read by omicverse.org/ports
+# Spec: https://github.com/omicverse/omicverse-org-home/blob/main/docs/PORT_MANIFEST.md
+# Place at the ROOT of the py-<pkg> / rust-<pkg> repository.
+schema: omicverse-port/v1
+package: py-<PkgName>               # repo name
+pypi: py<pkgname>                   # pip install …
+import_name: <pkgname>              # import …
+language: python                    # python | rust
+domain: single-cell                 # single-cell | spatial | trajectory | bulk | proteomics | metabolomics | genetics | immune | microbiome | hic | stats | visualization | other
+
+upstream:
+  name: <UpstreamR>                 # upstream package name, R casing
+  source: Bioconductor              # CRAN | Bioconductor | GitHub | other
+  version: "1.2.3"                  # pinned upstream version the port tracks
+  url: https://bioconductor.org/packages/<UpstreamR>
+  license: GPL-3
+  citation: "<First author> et al. (<Year>) <Journal>"
+
+omicverse:
+  module: ov.<subpackage>.<Name>    # or null if not surfaced in omicverse yet
+  since: null
+
+parity:
+  status: unverified                # pass | partial | unverified
+  algorithm_class: deterministic    # see omicverse-rebuildr/PARITY_TAXONOMY.md
+  metric: pearson
+  threshold: 0.99
+  value: null
+  fixture: "<dataset>, <n cells × m genes>"
+  test: tests/test_exact_match.py
+
+artifacts:
+  audit: AUDIT.md
+  report: RECONSTRUCTION_REPORT.md
+  compare_notebook: examples/compare_R_vs_Python.ipynb
+  function_notebook: examples/function_by_function_R_parity.ipynb
+
+functions:
+  - r: <rFnA>
+    py: <pkgname>.<fn_a>
+    aliases: [<pkgname>.<rFnA>]
+    status: ported                  # ported | partial | planned | skipped
+    parity: exact                   # exact | approx | behavioural | none
+    note: null
+    test: tests/test_<fn_a>.py
+  - r: <rFnB>
+    py: <pkgname>.<fn_b>
+    status: partial
+    parity: approx
+    note: "argument X not supported yet"
+  - r: <rPlotFn>
+    py: null
+    status: skipped
+    note: "plotting only; use scanpy / matplotlib"
+
+classes:
+  - r: <RS4Class>
+    py: <pkgname>.<PyClass>

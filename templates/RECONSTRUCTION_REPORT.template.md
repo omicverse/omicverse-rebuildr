@@ -152,6 +152,7 @@ All items below are **mandatory** for release. "Deferred" is not a valid status.
 | `ITERATION_LOG.md` complete and parseable | ✅ |
 | `DISCOVERY.md` committed (Phase 0.5 artefact) | ✅ |
 | `AUDIT.md` produced by `engine.r_function_audit` | ✅ |
+| `port.yaml` (root) generated via `engine.r_function_audit --port-yaml`, hand-reviewed, parses | ✅ |
 | License compatible with upstream | ✅ <license> |
 | Version pinned to 0.1.0 | ✅ |
 | GitHub repo created under `omicverse/` | ✅ <URL> |
