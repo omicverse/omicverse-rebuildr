@@ -17,7 +17,7 @@ import yaml
 
 # Vendored copy of engine/parity_metrics.py — every port ships its own copy
 # rather than depending on the omicverse-rebuildr kit at runtime.
-from .parity_metrics import compute_parity, is_pass
+from .parity_metrics import compute_parity, is_pass, extract_output
 
 HERE = Path(__file__).parent
 PORT_DIR = HERE.parent
@@ -36,6 +36,8 @@ def manifest():
 def reference_output(manifest, tmp_path_factory):
     """Run the R reference once per session; cache the JSON."""
     cache = PORT_DIR / "data" / "reference_output.json"
+    # Cached references are reused until explicitly removed. Delete this file
+    # after changing the fixture, reference script, or R package/environment.
     if cache.exists():
         return json.loads(cache.read_text())
 
@@ -84,20 +86,17 @@ def test_parity_against_R(manifest, reference_output, candidate_output):
     failures = []
     for spec in outputs:
         name = spec["name"]
-        ref_key = spec["location_reference"].lstrip("$.")
-        cand_key = (
-            spec["location_candidate"].split("[")[-1].strip("]'\"")
-            if "[" in spec["location_candidate"]
-            else spec["location_candidate"].rsplit(".", 1)[-1]
-        )
         cls = spec.get("metric", manifest["algorithm_class"])
         threshold = spec.get("threshold", manifest["parity_threshold"])
+        params = spec.get("metric_params", {})
         metric = compute_parity(
-            reference_output[ref_key],
-            candidate_output[cand_key],
+            extract_output(reference_output, spec["location_reference"]),
+            extract_output(candidate_output, spec["location_candidate"]),
             cls,
+            **params,
         )
-        if not is_pass(metric, cls, threshold):
+        gate_params = {"top_k": params.get("top_k", 50)} if cls == "inference" else {}
+        if not is_pass(metric, cls, threshold, **gate_params):
             failures.append((name, metric, threshold))
         print(f"[parity] {name}: metric={metric} threshold={threshold}")
 

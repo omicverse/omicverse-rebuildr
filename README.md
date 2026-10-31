@@ -1,6 +1,6 @@
 # Omicverse-RebuildR
 
-**A fixed, reproducible protocol for porting R / Bioconductor packages to pure-Python `py-<pkg>` standalones, with cryptographic-grade numerical parity against the R reference.**
+**A fixed, reproducible protocol for porting R / Bioconductor packages to pure-Python `py-<pkg>` standalones, with class-aware numerical parity checks against the R reference on specified fixtures.**
 
 🇨🇳 **中文版**: [README.zh.md](README.zh.md)
 
@@ -179,7 +179,7 @@ Every algebraic rewrite the Acceleration Agent commits must carry one of these p
 
 | Proof class | Meaning | Examples |
 |---|---|---|
-| **(E) Exact identity** | The rewrite produces bit-equivalent output by mathematical identity. | `X^T X` cached outside a loop; Woodbury `(I + λ U Λ U^T)^{-1}`; Schur complement; Cholesky vs LU. |
+| **(E) Exact identity** | The rewrite is mathematically equivalent; floating-point agreement is checked by the parity gate. | `X^T X` cached outside a loop; Woodbury `(I + λ U Λ U^T)^{-1}`; Schur complement; Cholesky vs LU. |
 | **(B) Bounded ε-approximation** | The rewrite introduces an error bounded by a closed-form expression in some small ε; the bound is derived in `MATH.md`, not handwaved. | Sparse soft-assignment via row truncation at ε = 1e-12 (with `‖W_new − W‖_F ≤ κ n K ε`); top-K kNN truncation of pairwise-distance matrix when downstream is local. |
 | **(C) Class-containment theorem** | A known theorem guarantees the rewrite produces the same output for the relevant input class. | Euclidean MST ⊆ Delaunay triangulation (Preparata-Shamos 1985, Toussaint 1980); MST ⊆ relative-neighbourhood graph. |
 
@@ -467,3 +467,9 @@ The kit itself is MIT. Each individual port matches its upstream R package's lic
 ## Provenance
 
 This protocol distils experience from porting ~10 canonical bioinformatics R / Bioconductor packages to Python under reference-driven parity gates. The reference for the underlying methodology is the "PolyPort" recipe (reference-driven cross-language library synthesis via LLM agents). All case-study ports live under `github.com/omicverse/py-*`; this folder factors out the recipe so each subsequent port follows the same engineering loop without re-deriving it from scratch.
+
+### Verification scope
+
+Parity gates establish agreement on the declared fixtures, not semantic equivalence over all inputs. The function audit matches names heuristically; a match is not a behavioral test. The pytest template reuses `data/reference_output.json`: delete it after changing reference inputs, scripts, or the R environment.
+
+The acceleration loop uses the existing warmup/repeated-run timer. Its timing includes conda/process startup, imports, and output I/O; it is an end-to-end measurement, not isolated algorithm time. High-variance runs use the median.

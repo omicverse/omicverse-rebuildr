@@ -1,6 +1,6 @@
 # Omicverse-RebuildR
 
-**一套固定、可复现的协议，用于把 R / Bioconductor 包重构为纯 Python `py-<pkg>` 独立包，并提供加密级精度的数值一致性证明。**
+**一套固定、可复现的协议，用于把 R / Bioconductor 包重构为纯 Python `py-<pkg>` 独立包，并在指定测试数据上按输出类别验证与 R 参考实现的数值一致性。**
 
 🇬🇧 **English version**: [README.md](README.md)
 
@@ -171,7 +171,7 @@ Acceleration Agent 提交的每一个代数重写都必须带下面其中一种�
 
 | 证明类 | 含义 | 例子 |
 |---|---|---|
-| **(E) Exact identity** | 重写在数学恒等式下产生 bit-equivalent 输出。 | `X^T X` 缓存到循环外；Woodbury `(I + λ U Λ U^T)^{-1}`；Schur complement；Cholesky vs LU。 |
+| **(E) Exact identity** | 重写在数学上等价；浮点结果的一致性仍由验收测试检查。 | `X^T X` 缓存到循环外；Woodbury `(I + λ U Λ U^T)^{-1}`；Schur complement；Cholesky vs LU。 |
 | **(B) Bounded ε-approximation** | 重写引入的误差有闭式上界；上界要在 `MATH.md` 推导，不能口嗨。 | 稀疏 soft-assignment 在 ε = 1e-12 行截断（带 `‖W_new − W‖_F ≤ κ n K ε`）；下游为局部时 top-K kNN 截断成对距离矩阵。 |
 | **(C) Class-containment 定理** | 已有定理保证重写在相关输入类上产生相同输出。 | 欧氏 MST ⊆ Delaunay 三角化（Preparata-Shamos 1985, Toussaint 1980）；MST ⊆ relative-neighbourhood graph。 |
 
@@ -452,3 +452,9 @@ Kit 本身 MIT。每个具体 port 匹配其上游 R 包的 license（上游 GPL
 ## 起源
 
 本协议提炼自把约 10 个经典生物信息学 R / Bioconductor 包重构为 Python 的工程经验（在 reference-driven parity gate 下）。底层方法论的 reference 是 "PolyPort" 菜谱（reference-driven cross-language library synthesis via LLM agents）。所有 case-study port 都在 `github.com/omicverse/py-*` 下；这个文件夹把菜谱抽出来，让每个后续 port 走同样的工程循环，不用从零推导。
+
+### 验证范围
+
+一致性验收只覆盖声明的测试数据，不构成整个输入空间上的语义等价证明。函数审计基于名称的启发式匹配，匹配成功不代表行为测试通过。pytest 模板复用 `data/reference_output.json`；修改参考输入、脚本或 R 环境后，应删除该文件并重新生成。
+
+加速循环复用已有的预热与重复计时工具。计时包含 conda/进程启动、导入和输出 I/O，属于端到端耗时，不是独立算法耗时；高波动测量采用中位数。

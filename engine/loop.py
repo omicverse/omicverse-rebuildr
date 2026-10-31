@@ -34,7 +34,8 @@ import yaml
 
 # Local import (this file lives in engine/ next to parity_metrics.py)
 sys.path.insert(0, str(Path(__file__).parent))
-from parity_metrics import compute_parity, is_pass  # noqa: E402
+from parity_metrics import compute_parity, is_pass, extract_output  # noqa: E402
+from benchmark import time_callable  # noqa: E402
 
 
 # ----------------------------------------------------------------------------- #
@@ -176,12 +177,14 @@ def parity_diff(
     results = []
     for output_spec in manifest.outputs:
         name = output_spec["name"]
-        ref_value = _extract(ref, output_spec["location_reference"])
-        cand_value = _extract(cand, output_spec["location_candidate"])
+        ref_value = extract_output(ref, output_spec["location_reference"])
+        cand_value = extract_output(cand, output_spec["location_candidate"])
         cls = output_spec.get("metric", manifest.algorithm_class)
         threshold = output_spec.get("threshold", manifest.parity_threshold)
-        metric = compute_parity(ref_value, cand_value, cls)
-        passed = is_pass(metric, cls, threshold)
+        params = output_spec.get("metric_params", {})
+        metric = compute_parity(ref_value, cand_value, cls, **params)
+        gate_params = {"top_k": params.get("top_k", 50)} if cls == "inference" else {}
+        passed = is_pass(metric, cls, threshold, **gate_params)
         results.append((name, metric, passed))
 
     all_passed = all(p for _, _, p in results)
@@ -193,26 +196,6 @@ def parity_diff(
         wall_clock_s=0.0,
         notes=summary,
     )
-
-
-def _extract(blob: dict, location: str):
-    """Tiny JSON-path extractor; supports $.a.b.c and adata.obs['x']-style hints.
-
-    For 'adata.obs[...]' style on the candidate side, the candidate script
-    must have flattened it into a plain JSON key already.
-    """
-    if location.startswith("$"):
-        cur = blob
-        for tok in location.lstrip("$.").split("."):
-            cur = cur[tok]
-        return cur
-    # Candidate hint — strip framework noise; assume the candidate runner
-    # already flattened the field to a top-level key matching the obs/obsm name.
-    bracket = location.find("[")
-    if bracket >= 0:
-        key = location[bracket:].strip("[]'\"")
-        return blob[key]
-    return blob[location.rsplit(".", 1)[-1]]
 
 
 def equivalence_phase(manifest: Manifest, port_dir: Path) -> TrialResult:
@@ -274,6 +257,7 @@ def acceleration_phase(
         cand.apply()
         trial = equivalence_phase(manifest, port_dir)
         t = _stopwatch_run_candidate(manifest, port_dir)
+        trial.wall_clock_s = t
         speedup = best_time / max(t, 1e-9)
         reward = (1.0 if trial.passed else 0.0) * speedup
         trial.notes = (
@@ -291,9 +275,9 @@ def acceleration_phase(
 
 
 def _stopwatch_run_candidate(manifest: Manifest, port_dir: Path) -> float:
-    t0 = time.time()
-    run_candidate(manifest, port_dir)
-    return time.time() - t0
+    timing = time_callable(run_candidate, manifest, port_dir)
+    print(f"[benchmark] end-to-end: {timing.to_human()}; runs={timing.wall_clock_runs_s}")
+    return timing.median_s if timing.cv > 0.10 else timing.mean_s
 
 
 # ----------------------------------------------------------------------------- #

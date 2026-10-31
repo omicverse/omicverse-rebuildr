@@ -40,8 +40,11 @@ outputs:
     type: "1d vector"
     location_reference: "$.Pseudotime"            # JSON path in reference_output.json
     location_candidate: "adata.obs['Pseudotime']"  # how to find it in the candidate AnnData
-    metric: pearson
+    metric: ordinal  # class name; ordinal computes absolute Pearson correlation
     threshold: 0.99
+    # Optional compute_parity keyword arguments, e.g. {top_k: 20} for inference.
+    # For inference, threshold controls Spearman; Jaccard retains its 0.7 default.
+    metric_params: {}
 
 # Optional held-out fixture for v1.1 hidden-fixture scoring.
 held_out_fixture:

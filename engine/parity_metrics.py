@@ -86,8 +86,8 @@ def parity_deterministic(
     Use the absolute mode (default) when all output values are O(1).
     Use ``rtol`` when values span many orders of magnitude.
     """
-    reference = np.asarray(reference, dtype=np.float64).ravel()
-    candidate = np.asarray(candidate, dtype=np.float64).ravel()
+    reference = np.asarray(reference, dtype=np.float64)
+    candidate = np.asarray(candidate, dtype=np.float64)
     if reference.shape != candidate.shape:
         raise ValueError(
             f"shape mismatch: {reference.shape} vs {candidate.shape}"
@@ -266,7 +266,8 @@ def compute_parity(
     return _DISPATCH[algorithm_class](reference, candidate, **kwargs)
 
 
-def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = None) -> bool:
+def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = None, *,
+            top_k: int = 50, jaccard_threshold: float = 0.7) -> bool:
     """Apply the per-class pass direction.
 
     - Deterministic family: lower is better; pass iff metric_value < threshold.
@@ -274,7 +275,8 @@ def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = N
       a port needs more than this for "deterministic" parity, the algorithm
       class is wrong; switch to `ordinal` (Pearson) or `embedding` (Procrustes).
 
-    - Inference: dict with two keys; pass iff BOTH clear their own thresholds.
+    - Inference: threshold applies to Spearman; jaccard_threshold applies to
+      top_k overlap (defaults: 0.90, 0.7, and 50).
 
     - Everything else: higher is better; pass iff metric_value >= threshold.
     """
@@ -293,8 +295,8 @@ def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = N
 
     if algorithm_class == "inference":
         return (
-            metric_value["spearman_neglog10p"] >= 0.90
-            and metric_value["top50_jaccard"] >= 0.7
+            metric_value["spearman_neglog10p"] >= threshold
+            and metric_value[f"top{top_k}_jaccard"] >= jaccard_threshold
         )
 
     # Ordinal: Pearson is bit-noisy on bit-equivalent inputs (~1 - 1e-15).
@@ -304,3 +306,23 @@ def is_pass(metric_value: Any, algorithm_class: str, threshold: float | None = N
         return float(metric_value) >= threshold - 1e-12
 
     return float(metric_value) >= threshold
+
+
+def extract_output(blob: dict, location: str):
+    """Tiny JSON-path extractor; supports $.a.b.c and adata.obs['x']-style hints.
+
+    For 'adata.obs[...]' style on the candidate side, the candidate script
+    must have flattened it into a plain JSON key already.
+    """
+    if location.startswith("$"):
+        cur = blob
+        for tok in location.lstrip("$.").split("."):
+            cur = cur[tok]
+        return cur
+    # Candidate hint — strip framework noise; assume the candidate runner
+    # already flattened the field to a top-level key matching the obs/obsm name.
+    bracket = location.find("[")
+    if bracket >= 0:
+        key = location[bracket:].strip("[]'\"")
+        return blob[key]
+    return blob[location.rsplit(".", 1)[-1]]
